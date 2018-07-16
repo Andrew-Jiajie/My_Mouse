@@ -1,6 +1,4 @@
 
-
-
 /******************************************************************************
 *   			...............,MMMMM...................
                 ...............,MMMMM...................
@@ -64,6 +62,96 @@
 #include "I2C.h"
 #include "Mouse.h"
 
+#include <hidboot.h>
+#include <usbhub.h>
+#include <Mouse.h>
+
+// Satisfy the IDE, which needs to see the include statment in the ino too.
+#ifdef dobogusinclude
+#include <spi4teensy3.h>
+#include <SPI.h>
+#endif
+
+#define MIDDLE_1 11
+#define MIDDLE_2 12
+#define LEFT_KEY 8
+#define RIGHT_KEY 9
+
+class MouseRptParser : public MouseReportParser
+{
+protected:
+	void OnMouseMove	(MOUSEINFO *mi);
+	void OnLeftButtonUp	(MOUSEINFO *mi);
+	void OnLeftButtonDown	(MOUSEINFO *mi);
+	void OnRightButtonUp	(MOUSEINFO *mi);
+	void OnRightButtonDown	(MOUSEINFO *mi);
+	void OnMiddleButtonUp	(MOUSEINFO *mi);
+	void OnMiddleButtonDown	(MOUSEINFO *mi);
+};
+
+bool left_last=false, left_now=false;
+bool right_last=false, right_now=false;
+bool middle_1_last=false, middle_1_now=false;
+bool middle_2_last=false, middle_2_now=false;
+bool wheel_enabled=false;
+int wheel_count=0;
+#define WHEEL_RATE 35
+
+int x_move, y_move;
+
+void MouseRptParser::OnMouseMove(MOUSEINFO *mi)
+{
+#if 0
+    Serial.print("dx=");
+    Serial.print(mi->dX, DEC);
+    Serial.print(" dy=");
+    Serial.println(mi->dY, DEC);
+#endif
+    if(wheel_enabled){
+      wheel_count+=mi->dY;
+      int wheel_out = wheel_count/WHEEL_RATE;
+      Mouse.move(0,0,-wheel_out);
+      wheel_count = wheel_count - wheel_out*WHEEL_RATE;
+    }else{
+      //Mouse.move(mi->dX,mi->dY);
+	  x_move = mi->dX;
+	  y_move = mi->dY;
+    }
+    
+};
+void MouseRptParser::OnLeftButtonUp	(MOUSEINFO *mi)
+{
+    Serial.println("L Butt Up");
+};
+void MouseRptParser::OnLeftButtonDown	(MOUSEINFO *mi)
+{
+    Serial.println("L Butt Dn");
+};
+void MouseRptParser::OnRightButtonUp	(MOUSEINFO *mi)
+{
+    Serial.println("R Butt Up");
+};
+void MouseRptParser::OnRightButtonDown	(MOUSEINFO *mi)
+{
+    Serial.println("R Butt Dn");
+};
+void MouseRptParser::OnMiddleButtonUp	(MOUSEINFO *mi)
+{
+    Serial.println("M Butt Up");
+};
+void MouseRptParser::OnMiddleButtonDown	(MOUSEINFO *mi)
+{
+    Serial.println("M Butt Dn");
+};
+
+USB     Usb;
+USBHub     Hub(&Usb);
+HIDBoot<USB_HID_PROTOCOL_MOUSE>    HidMouse(&Usb);
+
+MouseRptParser                               Prs;
+
+
+
 uint8_t 	Data_Buff[44];
 uint16_t	ui16SnapStatus[15], ui16PrevSnap[15];
 
@@ -84,6 +172,29 @@ void setup()
 	// Setup serial baud rate
 	//
 	Serial.begin(115200);
+	
+	
+#if !defined(__MIPSEL__)
+    while (!Serial); // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
+#endif
+    Serial.println("Start");
+	
+    if (Usb.Init() == -1)
+        Serial.println("OSC did not start.");
+
+    delay( 200 );
+    HidMouse.SetReportParser(0, &Prs);
+    
+    pinMode(LEFT_KEY,OUTPUT);
+    pinMode(RIGHT_KEY,OUTPUT);
+    pinMode(MIDDLE_1,OUTPUT);
+    pinMode(MIDDLE_2,OUTPUT);
+    digitalWrite(LEFT_KEY, LOW);
+    digitalWrite(RIGHT_KEY, LOW);
+    digitalWrite(MIDDLE_1, LOW);
+    digitalWrite(MIDDLE_2, LOW);
+    Mouse.begin();
+	
 	//
 	// Configure RDY pin
 	//
@@ -103,7 +214,7 @@ void setup()
 	// End the communication window
 	//
 	Close_Comms();
-	Mouse.begin();
+	//Mouse.begin();
 }
 
 //*****************************************************************************
@@ -127,7 +238,8 @@ void loop()
 	// interrupt, and then trigger the i2c when the RDY interrupt sees a rising
 	// edge.
 	//
-	RDY_wait();
+	Usb.Task();
+	//RDY_wait();
 	
 	I2C_Read(GestureEvents0_adr, &Data_Buff[0], 44);
 

@@ -129,6 +129,8 @@ void DisplaySnap(void)
 //! \return None
 //                                                      
 //*****************************************************************************
+extern int x_move, y_move;
+
 void Process_XY(void) 
 { 
 	uint8_t 	i,j; 
@@ -166,12 +168,14 @@ void Process_XY(void)
 	if((Data_Buff[0]) == SINGLE_TAP) 
 	{		
 		Serial.println("Single Tap  "); 
+		Mouse.click(MOUSE_LEFT);
 	}
 	else if((Data_Buff[1]) == TWO_FINGER_TAP)   
 	{
 		Serial.println("2 Finger Tap"); 
-	}		
-
+		Mouse.click(MOUSE_RIGHT);
+	}
+	
 	if(ui8NoOfFingers != 0) 
 	{
 		if (!(ui8FirstTouch)) 
@@ -213,6 +217,7 @@ void Process_XY(void)
 			case ZOOM			:  	Serial.print("Zoom        "); 
 									break;
 		}
+
 		if((Data_Buff[0] | Data_Buff[1]) == 0) 
 		{
 			Serial.print("            ");
@@ -238,12 +243,7 @@ void Process_XY(void)
 		Serial.println("");
 		
 		
-		if((Data_Buff[0]) == SINGLE_TAP){
-			Mouse.click(MOUSE_LEFT);
-		}
-		if((Data_Buff[1]) == TWO_FINGER_TAP){
-			Mouse.click(MOUSE_RIGHT);
-		}
+
 		if(ui8NoOfFingers==3){
 			uint16_t temp=0;
 			for(i=1; i<4; i++){
@@ -256,9 +256,13 @@ void Process_XY(void)
 				}
 			}
 			if(ui16AbsX[2]>400){
-				Mouse.move(0, 0, i16RelY[1]);
+				Mouse.move(0, 0, y_move/2);
+				x_move = 0;
+				y_move = 0;
 			}else if(ui16AbsX[2]<360){
-				Mouse.move(i16RelX[1]*2, i16RelY[1], 0);
+				Mouse.move(x_move, y_move, 0);
+				x_move = 0;
+				y_move = 0;
 			}
 		}
 	} 
